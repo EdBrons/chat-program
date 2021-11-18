@@ -12,6 +12,8 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
+#include "defs.h"
+
 #define BACKLOG 10
 #define BUF_SIZE 4096
 

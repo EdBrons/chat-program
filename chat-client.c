@@ -11,7 +11,24 @@
 #include <netdb.h>
 #include <string.h>
 
+#include "defs.h"
+
 #define BUF_SIZE 4096
+
+void read_message(struct message *m) {
+    char buf[BUF_SIZE] = { 0 };
+    char mode = CHAT;
+    int n;
+    if (fgets(buf, BUF_SIZE, stdin) != NULL) {
+        if (strncmp(buf, "/nick ", 6) == 0) {
+            memcpy(m->text, buf+6, TEXT_LEN);
+            mode = NICK;
+        }
+        else {
+            memcpy(m->text, buf, TEXT_LEN);
+        }
+    }
+}
 
 int main(int argc, char *argv[])
 {
@@ -49,12 +66,12 @@ int main(int argc, char *argv[])
 
     /* infinite loop of reading from terminal, sending the data, and printing
      * what we get back */
-    while((n = read(0, buf, BUF_SIZE)) > 0) {
-        send(conn_fd, buf, n, 0);
-
-        n = recv(conn_fd, buf, BUF_SIZE, 0);
-        printf("received: ");
-        puts(buf);
+    // send(conn_fd, buf, n, 0);
+    // n = recv(conn_fd, buf, BUF_SIZE, 0);
+    while (1) {
+        struct message m;
+        read_message(&m);
+        puts(m.text);
     }
 
     close(conn_fd);
