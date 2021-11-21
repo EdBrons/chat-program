@@ -61,13 +61,20 @@ int main(int argc, char *argv[])
         remote_port = ntohs(remote_sa.sin_port);
         printf("new connection from %s:%d\n", remote_ip, remote_port);
 
+        struct message *m = malloc(sizeof(struct message));
+        memset(buf, 0, sizeof(buf));
+        memset(m, 0, sizeof(struct message));
         /* receive and echo data until the other end closes the connection */
         while((bytes_received = recv(conn_fd, buf, BUF_SIZE, 0)) > 0) {
-            printf(".");
+            memcpy(m, buf, sizeof(struct message));
+            printf("mode: %d\ntext: %s\n", m->mode, m->text);
             fflush(stdout);
 
             /* send it back */
             send(conn_fd, buf, bytes_received, 0);
+
+            memset(buf, 0, sizeof(buf));
+            memset(m, 0, sizeof(struct message));
         }
         printf("\n");
 

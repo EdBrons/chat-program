@@ -10,24 +10,43 @@
 #include <stdio.h>
 #include <netdb.h>
 #include <string.h>
+#include <pthread.h>
 
 #include "defs.h"
 
 #define BUF_SIZE 4096
 
-void read_message(struct message *m) {
-    char buf[BUF_SIZE] = { 0 };
-    char mode = CHAT;
-    int n;
-    if (fgets(buf, BUF_SIZE, stdin) != NULL) {
-        if (strncmp(buf, "/nick ", 6) == 0) {
-            memcpy(m->text, buf+6, TEXT_LEN);
-            mode = NICK;
-        }
-        else {
-            memcpy(m->text, buf, TEXT_LEN);
-        }
+struct shared_info {
+    int conn_fd;
+};
+
+void *handle_client(void *arg) {
+    struct shared_info *s = arg;
+    char buf[BUF_SIZE];
+    char *message = malloc(sizeof(struct message));
+    memset(buf, 0, BUF_SIZE);
+    memset(message, 0, sizeof(struct message));
+    while (fgets(buf, BUF_SIZE, stdin) != NULL) {
+        strncpy(((struct message *)message)->text, buf, sizeof(struct message));
+        ((struct message *)message)->mode = CHAT;
+        send(s->conn_fd, message, sizeof(struct message), 0);
+        memset(buf, 0, BUF_SIZE);
+        memset(message, 0, sizeof(struct message));
     }
+    return NULL;
+}
+
+// TODO: kill this process after handle_client ends
+void *listen_server(void *arg) {
+    struct shared_info *s = arg;
+    char buf[BUF_SIZE];
+    while (1) {
+        recv(s->conn_fd, buf, BUF_SIZE, 0);
+        struct message m;
+        memcpy(&m, buf, TEXT_LEN);
+        puts(m.text);
+    }
+    return NULL;
 }
 
 int main(int argc, char *argv[])
@@ -35,8 +54,6 @@ int main(int argc, char *argv[])
     char *dest_hostname, *dest_port;
     struct addrinfo hints, *res;
     int conn_fd;
-    char buf[BUF_SIZE];
-    int n;
     int rc;
 
     dest_hostname = argv[1];
@@ -64,15 +81,17 @@ int main(int argc, char *argv[])
 
     printf("Connected\n");
 
-    /* infinite loop of reading from terminal, sending the data, and printing
-     * what we get back */
-    // send(conn_fd, buf, n, 0);
-    // n = recv(conn_fd, buf, BUF_SIZE, 0);
-    while (1) {
-        struct message m;
-        read_message(&m);
-        puts(m.text);
-    }
+    struct shared_info s;
+    s.conn_fd = conn_fd;
+
+    pthread_t client_thread;
+    pthread_create(&client_thread, NULL, handle_client, &s);
+
+    pthread_t listen_thread;
+    pthread_create(&listen_thread, NULL, listen_server, &s);
+
+    pthread_join(client_thread, NULL);
+    pthread_join(listen_thread, NULL);
 
     close(conn_fd);
 }
