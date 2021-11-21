@@ -17,6 +17,13 @@
 #define BACKLOG 10
 #define BUF_SIZE 4096
 
+static size_t thread_count = 0;
+static size_t threads_len = 64;
+static pthread_t *threads;
+
+void *listen_client(void *arg) {
+}
+
 int main(int argc, char *argv[])
 {
     char *listen_port;
@@ -50,6 +57,8 @@ int main(int argc, char *argv[])
     /* start listening */
     listen(listen_fd, BACKLOG);
 
+    threads = malloc(sizeof(pthread_t) * thread_count);
+
     /* infinite loop of accepting new connections and handling them */
     while(1) {
         /* accept a new connection (will block until one appears) */
@@ -61,20 +70,13 @@ int main(int argc, char *argv[])
         remote_port = ntohs(remote_sa.sin_port);
         printf("new connection from %s:%d\n", remote_ip, remote_port);
 
-        struct message *m = malloc(sizeof(struct message));
-        memset(buf, 0, sizeof(buf));
-        memset(m, 0, sizeof(struct message));
         /* receive and echo data until the other end closes the connection */
         while((bytes_received = recv(conn_fd, buf, BUF_SIZE, 0)) > 0) {
-            memcpy(m, buf, sizeof(struct message));
-            printf("mode: %d\ntext: %s\n", m->mode, m->text);
+            printf(".");
             fflush(stdout);
-
             /* send it back */
             send(conn_fd, buf, bytes_received, 0);
-
             memset(buf, 0, sizeof(buf));
-            memset(m, 0, sizeof(struct message));
         }
         printf("\n");
 

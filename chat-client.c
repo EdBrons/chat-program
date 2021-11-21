@@ -16,35 +16,36 @@
 
 #define BUF_SIZE 4096
 
-struct shared_info {
-    int conn_fd;
-};
-
 void *handle_client(void *arg) {
-    struct shared_info *s = arg;
+    struct thread_args *s = arg;
     char buf[BUF_SIZE];
-    char *message = malloc(sizeof(struct message));
+    struct message *mes = malloc(sizeof(struct message));
     memset(buf, 0, BUF_SIZE);
-    memset(message, 0, sizeof(struct message));
+    memset(mes, 0, sizeof(struct message));
     while (fgets(buf, BUF_SIZE, stdin) != NULL) {
-        strncpy(((struct message *)message)->text, buf, sizeof(struct message));
-        ((struct message *)message)->mode = CHAT;
-        send(s->conn_fd, message, sizeof(struct message), 0);
+        parse_line(buf, mes);
+        send(s->conn_fd, (char *)mes, sizeof(struct message), 0);
         memset(buf, 0, BUF_SIZE);
-        memset(message, 0, sizeof(struct message));
+        memset(mes, 0, sizeof(struct message));
     }
     return NULL;
 }
 
 // TODO: kill this process after handle_client ends
 void *listen_server(void *arg) {
-    struct shared_info *s = arg;
-    char buf[BUF_SIZE];
+    struct thread_args *ta = arg;
+    struct message *mes = malloc(sizeof(struct message));
+    memset(mes, 0, sizeof(struct message));
     while (1) {
-        recv(s->conn_fd, buf, BUF_SIZE, 0);
-        struct message m;
-        memcpy(&m, buf, TEXT_LEN);
-        puts(m.text);
+        recv(ta->conn_fd, (char *)mes, sizeof(struct message), 0);
+
+        if (mes->mode == NICK) {
+            printf("change name to: %s\n", mes->from);
+        } else {
+            printf("message body: %s\n", mes->body);
+        }
+
+        memset(mes, 0, sizeof(struct message));
     }
     return NULL;
 }
@@ -81,14 +82,14 @@ int main(int argc, char *argv[])
 
     printf("Connected\n");
 
-    struct shared_info s;
-    s.conn_fd = conn_fd;
+    struct thread_args ta;
+    ta.conn_fd = conn_fd;
 
     pthread_t client_thread;
-    pthread_create(&client_thread, NULL, handle_client, &s);
+    pthread_create(&client_thread, NULL, handle_client, &ta);
 
     pthread_t listen_thread;
-    pthread_create(&listen_thread, NULL, listen_server, &s);
+    pthread_create(&listen_thread, NULL, listen_server, &ta);
 
     pthread_join(client_thread, NULL);
     pthread_join(listen_thread, NULL);
