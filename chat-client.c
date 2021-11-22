@@ -13,10 +13,18 @@
 #include <pthread.h>
 #include "defs.h"
 
+/* writes bytes from a message directly into a socket */
 ssize_t send_message_to_server(int conn_fd, struct message *m) {
     return send(conn_fd, (char *)m, sizeof(struct message), 0);
 }
 
+/* reads bytes from a socket directly into a message struct */
+ssize_t read_message_from_server(int conn_fd, struct message *m) {
+    return recv(conn_fd, (char *)m, sizeof(struct message), 0);
+}
+
+/* we parse the input in read_message, and then send the
+ * struct directly over the socket */
 void *handle_io(void *arg) {
     int conn_fd;
     struct message m;
@@ -30,9 +38,17 @@ void *handle_io(void *arg) {
     return NULL;
 }
 
+/* we read the bytes from the socket directly into a message struct
+ * and then handle it from there */
 void *handle_conn(void *arg) {
     int conn_fd;
     memcpy(&conn_fd, arg, sizeof(int));
+    struct message m;
+    memset(&m, 0, sizeof(struct message));
+    while (read_message_from_server(conn_fd, &m) != -1) {
+        printf("%s: %s\n", m.sender, m.body);
+
+    }
     return NULL;
 }
 
