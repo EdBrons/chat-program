@@ -10,7 +10,8 @@ struct message {
     char body[BODY_LEN];
 };
 
-/* reads a message into m from stdin */
-int read_message(struct message *m);
+/* reads a message into m from stdin 
+ * sets the contents of m to 0, before writing */
+int read_message_from_stdin(struct message *m);
 
 #endif

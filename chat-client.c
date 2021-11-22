@@ -30,7 +30,7 @@ void *handle_io(void *arg) {
     struct message m;
     memcpy(&conn_fd, arg, sizeof(int));
     memset(&m, 0, sizeof(struct message));
-    while (read_message(&m) != -1) {
+    while (read_message_from_stdin(&m) != -1) {
         if (send_message_to_server(conn_fd, &m) == -1) {
             perror("send");
         }
