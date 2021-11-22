@@ -23,6 +23,7 @@ struct thread_info {
     int conn_fd;
     int new_message_flag;
     int in_use_flag;
+    char client_name[NAME_LEN];
     pthread_t thread;
 };
 
@@ -50,14 +51,42 @@ struct thread_info *find_empty_thread_info() {
     return NULL;
 }
 
+void share_message(struct message *m) {
+    memcpy(new_message, m, sizeof(struct message));
+    for (int i = 0; i < thread_max; i++) {
+        if (!thread_info_arr[i].in_use_flag) {
+            thread_info_arr[i].new_message_flag = 1;
+        }
+    }
+}
+
+/* sends message directly to client */
+ssize_t send_message_to_client(int conn_fd, struct message *m) {
+    return send(conn_fd, (char *)m, sizeof(struct message), 0);
+}
+
+/* reads bytes from the socket into the message struct */
+ssize_t read_message_from_client(int conn_fd, struct message *m) {
+    return recv(conn_fd, (char *)m, sizeof(struct message), 0);
+}
+
 void *handle_client(void *arg) {
     struct thread_info *t = (struct thread_info *)arg;
-    char buf[BUF_SIZE];
-    int bytes_received;
-    while((bytes_received = recv(t->conn_fd, buf, BUF_SIZE, 0)) > 0) {
-        printf(".");
-        fflush(stdout);
-        send(t->conn_fd, buf, bytes_received, 0);
+    struct message m;
+    memset(&m, 0, sizeof(struct message));
+    while(read_message_from_client(t->conn_fd, &m) != -1) {
+        if (t->new_message_flag) {
+            /* check if we have a new message */
+            send_message_to_client(t->conn_fd, new_message);
+            t->new_message_flag = 0;
+        } else {
+            /* otherwise we alert other threads of this new message */
+            printf("New message from %s.\n", t->client_name);
+            fflush(stdout);
+            memcpy(m.sender, t->client_name, NAME_LEN);
+            share_message(&m);
+            // send_message_to_client(t->conn_fd, &m);
+        }
     }
     printf("\n");
     close(t->conn_fd);
@@ -121,6 +150,7 @@ int main(int argc, char *argv[])
         t->conn_fd = conn_fd;
         t->new_message_flag = 0;
         t->in_use_flag = 1;
+        snprintf(t->client_name, NAME_LEN, "user_%s:%d", remote_ip, remote_port);
         thread_count++;
         pthread_create(&t->thread, NULL, handle_client, t);
     }
@@ -128,7 +158,7 @@ int main(int argc, char *argv[])
     /* join threads */
     for (int i = 0; i < thread_max; i++) {
         if (!thread_info_arr[i].in_use_flag) {
-            pthread_join(thread_info_arr[i].thread, NULL);
+            // pthread_join(thread_info_arr[i].thread, NULL);
         }
     }
 }
