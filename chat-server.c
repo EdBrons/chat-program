@@ -3,7 +3,7 @@
  */
 
 #include <stdlib.h>
-#include <sys/types.h>
+#include <sys/types.h> 
 #include <sys/socket.h>
 #include <sys/mman.h>
 #include <netinet/in.h>
@@ -42,8 +42,10 @@ void grow_thread_info_arr() {
 }
 
 struct thread_info *find_empty_thread_info() {
-    for (struct thread_info *p = thread_info_arr; p != NULL; p++) {
-        return p;
+    for (int i = 0; i < thread_max; i++) {
+        if (!thread_info_arr[i].in_use_flag) {
+            return &thread_info_arr[i];
+        }
     }
     return NULL;
 }
@@ -58,6 +60,7 @@ void *handle_client(void *arg) {
         send(t->conn_fd, buf, bytes_received, 0);
     }
     printf("\n");
+    close(t->conn_fd);
     return NULL;
 }
 
@@ -118,16 +121,15 @@ int main(int argc, char *argv[])
         t->conn_fd = conn_fd;
         t->new_message_flag = 0;
         t->in_use_flag = 1;
+        thread_count++;
         pthread_create(&t->thread, NULL, handle_client, t);
+    }
 
-        /* join threads */
-        for (int i = 0; i < thread_max; i++) {
-            if (!thread_info_arr[i].in_use_flag) {
-                pthread_join(thread_info_arr[i].thread, NULL);
-            }
+    /* join threads */
+    for (int i = 0; i < thread_max; i++) {
+        if (!thread_info_arr[i].in_use_flag) {
+            pthread_join(thread_info_arr[i].thread, NULL);
         }
-
-        close(conn_fd);
     }
 }
 
