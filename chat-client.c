@@ -11,18 +11,21 @@
 #include <netdb.h>
 #include <string.h>
 #include <pthread.h>
+#include "defs.h"
 
-#define BUF_SIZE 4096
+ssize_t send_message_to_server(int conn_fd, struct message *m) {
+    return send(conn_fd, (char *)m, sizeof(struct message), 0);
+}
 
 void *handle_io(void *arg) {
     int conn_fd;
-    char buf[BUF_SIZE] = { 0 };
+    struct message m;
     memcpy(&conn_fd, arg, sizeof(int));
-    while (fgets(buf, BUF_SIZE, stdin)) {
-        /* uncomment this to remove newlines from buf */
-        // buf[strcspn(buf, "\n")] = '\0';
-        puts(buf);
-        memset(buf, 0, BUF_SIZE);
+    memset(&m, 0, sizeof(struct message));
+    while (read_message(&m) != -1) {
+        if (send_message_to_server(conn_fd, &m) == -1) {
+            perror("send");
+        }
     }
     return NULL;
 }
