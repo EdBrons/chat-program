@@ -9,6 +9,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <errno.h>
 #include "defs.h"
 
 #define BACKLOG 10
@@ -65,20 +66,43 @@ void share_message(struct thread_info *t, struct message *m) {
     }
 }
 
+void create_nick_message(struct thread_info *t, struct message *m, char *name) {
+    strncpy(m->sender, "Server", NAME_LEN);
+    snprintf(m->body, BODY_LEN, "%s has changed their name to %s.", t->client_name, name);
+}
+
+void create_connect_message(struct thread_info *t, struct message *m) {
+    strncpy(m->sender, "Server", NAME_LEN);
+    snprintf(m->body, BODY_LEN, "%s connected.", t->client_name);
+}
+
+void create_disconnect_message(struct thread_info *t, struct message *m) {
+    strncpy(m->sender, "Server", NAME_LEN);
+    snprintf(m->body, BODY_LEN, "%s disconnected.", t->client_name);
+}
+
+
 void *handle_client(void *arg) {
     struct thread_info *t = (struct thread_info *)arg;
     struct message m;
     memset(&m, 0, sizeof(struct message));
-    while(read_message_from_client(t, &m) != -1) {
+    while(read_message_from_client(t, &m) > 0) {
         if (m.sender[0] != '\0' && m.body[0] == '\0') {
-            memcpy(t->client_name, m.sender, NAME_LEN);
+            char new_name[NAME_LEN];
+            strncpy(new_name, m.sender, NAME_LEN);
+            create_nick_message(t, &m, new_name);
+            share_message(t, &m);
+            memcpy(t->client_name, new_name, NAME_LEN);
         } else {
             memcpy(m.sender, t->client_name, NAME_LEN);
             share_message(t, &m);
         }
     }
-    printf("\n");
+    if (LOG) printf("LOG: client %s disconnected.\n", t->client_name);
+    create_disconnect_message(t, &m);
+    share_message(t, &m);
     close(t->conn_fd);
+    memset(t, 0, sizeof(struct thread_info));
     return NULL;
 }
 
@@ -125,7 +149,7 @@ int main(int argc, char *argv[])
         /* announce our communication partner */
         remote_ip = inet_ntoa(remote_sa.sin_addr);
         remote_port = ntohs(remote_sa.sin_port);
-        printf("new connection from %s:%d\n", remote_ip, remote_port);
+        if (LOG ) printf("LOG: new connection from %s:%d\n", remote_ip, remote_port);
 
         /* make sure we have enough space in thread arr */
         if (thread_count >= thread_max) {
