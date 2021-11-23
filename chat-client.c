@@ -1,7 +1,3 @@
-/*
- * echo-client.c
- */
-
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -11,10 +7,46 @@
 #include <netdb.h>
 #include <string.h>
 #include <pthread.h>
-
 #include "defs.h"
 
-#define BUF_SIZE 4096
+/* writes bytes from a message directly into a socket */
+ssize_t send_message_to_server(int conn_fd, struct message *m) {
+    return send(conn_fd, (char *)m, sizeof(struct message), 0);
+}
+
+/* reads bytes from a socket directly into a message struct */
+ssize_t read_message_from_server(int conn_fd, struct message *m) {
+    return recv(conn_fd, (char *)m, sizeof(struct message), 0);
+}
+
+/* we parse the input in read_message, and then send the
+ * struct directly over the socket */
+void *handle_io(void *arg) {
+    int conn_fd;
+    struct message m;
+    memcpy(&conn_fd, arg, sizeof(int));
+    memset(&m, 0, sizeof(struct message));
+    while (read_message_from_stdin(&m) != -1) {
+        if (send_message_to_server(conn_fd, &m) == -1) {
+            perror("send");
+        }
+    }
+    return NULL;
+}
+
+/* we read the bytes from the socket directly into a message struct
+ * and then handle it from there */
+void *handle_conn(void *arg) {
+    int conn_fd;
+    memcpy(&conn_fd, arg, sizeof(int));
+    struct message m;
+    memset(&m, 0, sizeof(struct message));
+    while (read_message_from_server(conn_fd, &m) != -1) {
+        printf("%s: %s\n", m.sender, m.body);
+        fflush(stdout);
+    }
+    return NULL;
+}
 
 void *handle_client(void *arg) {
     struct thread_args *s = arg;
@@ -57,6 +89,9 @@ int main(int argc, char *argv[])
     int conn_fd;
     int rc;
 
+    pthread_t io_thread;
+    pthread_t conn_thread;
+
     dest_hostname = argv[1];
     dest_port     = argv[2];
 
@@ -82,17 +117,11 @@ int main(int argc, char *argv[])
 
     printf("Connected\n");
 
-    struct thread_args ta;
-    ta.conn_fd = conn_fd;
+    pthread_create(&io_thread, NULL, handle_io, &conn_fd);
+    pthread_create(&conn_thread, NULL, handle_conn, &conn_fd);
 
-    pthread_t client_thread;
-    pthread_create(&client_thread, NULL, handle_client, &ta);
-
-    pthread_t listen_thread;
-    pthread_create(&listen_thread, NULL, listen_server, &ta);
-
-    pthread_join(client_thread, NULL);
-    pthread_join(listen_thread, NULL);
+    pthread_join(io_thread, NULL);
+    pthread_join(conn_thread, NULL);
 
     close(conn_fd);
 }
