@@ -21,7 +21,6 @@
 
 struct thread_info {
     int conn_fd;
-    int new_message_flag;
     int in_use_flag;
     char client_name[NAME_LEN];
     pthread_t thread;
@@ -30,7 +29,6 @@ struct thread_info {
 static size_t thread_max = INITIAL_THREAD_MAX;
 static size_t thread_count = 0;
 static struct thread_info *thread_info_arr = NULL;
-static struct message *new_message = NULL;
 
 void init_thread_info_arr() {
     munmap(thread_info_arr, sizeof(struct thread_info) * thread_max);
@@ -51,42 +49,32 @@ struct thread_info *find_empty_thread_info() {
     return NULL;
 }
 
-void share_message(struct message *m) {
-    memcpy(new_message, m, sizeof(struct message));
-    for (int i = 0; i < thread_max; i++) {
-        if (!thread_info_arr[i].in_use_flag) {
-            thread_info_arr[i].new_message_flag = 1;
-        }
-    }
-}
-
 /* sends message directly to client */
-ssize_t send_message_to_client(int conn_fd, struct message *m) {
-    return send(conn_fd, (char *)m, sizeof(struct message), 0);
+ssize_t send_message_to_client(struct thread_info *t, struct message *m) {
+    if (LOG) printf("LOG: sent a message to %s.\n", t->client_name);
+    return send(t->conn_fd, (char *)m, sizeof(struct message), 0);
 }
 
 /* reads bytes from the socket into the message struct */
-ssize_t read_message_from_client(int conn_fd, struct message *m) {
-    return recv(conn_fd, (char *)m, sizeof(struct message), 0);
+ssize_t read_message_from_client(struct thread_info *t, struct message *m) {
+    if (LOG) printf("LOG: received a message from %s.\n", t->client_name);
+    return recv(t->conn_fd, (char *)m, sizeof(struct message), 0);
+}
+
+void share_message(struct thread_info *t, struct message *m) {
+    for (int i = 0; i < thread_max; i++) {
+        if (thread_info_arr[i].in_use_flag && t != &thread_info_arr[i]) {
+            send_message_to_client(&thread_info_arr[i], m);
+        }
+    }
 }
 
 void *handle_client(void *arg) {
     struct thread_info *t = (struct thread_info *)arg;
     struct message m;
     memset(&m, 0, sizeof(struct message));
-    while(read_message_from_client(t->conn_fd, &m) != -1) {
-        if (t->new_message_flag) {
-            /* check if we have a new message */
-            send_message_to_client(t->conn_fd, new_message);
-            t->new_message_flag = 0;
-        } else {
-            /* otherwise we alert other threads of this new message */
-            printf("New message from %s.\n", t->client_name);
-            fflush(stdout);
-            memcpy(m.sender, t->client_name, NAME_LEN);
-            share_message(&m);
-            // send_message_to_client(t->conn_fd, &m);
-        }
+    while(read_message_from_client(t, &m) != -1) {
+        share_message(t, &m);
     }
     printf("\n");
     close(t->conn_fd);
@@ -108,7 +96,7 @@ int main(int argc, char *argv[])
 
     /* initialize shared memory */
     init_thread_info_arr();
-    new_message = (struct message *)mmap(NULL, sizeof(struct message), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+    // new_message = (struct message *)mmap(NULL, sizeof(struct message), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 
     /* create a socket */
     listen_fd = socket(PF_INET, SOCK_STREAM, 0);
@@ -148,9 +136,8 @@ int main(int argc, char *argv[])
         struct thread_info *t = find_empty_thread_info();
         memset(t, 0, sizeof(struct thread_info));
         t->conn_fd = conn_fd;
-        t->new_message_flag = 0;
         t->in_use_flag = 1;
-        snprintf(t->client_name, NAME_LEN, "user_%s:%d", remote_ip, remote_port);
+        snprintf(t->client_name, NAME_LEN, "user_%ld", thread_count);
         thread_count++;
         pthread_create(&t->thread, NULL, handle_client, t);
     }
@@ -158,7 +145,7 @@ int main(int argc, char *argv[])
     /* join threads */
     for (int i = 0; i < thread_max; i++) {
         if (!thread_info_arr[i].in_use_flag) {
-            // pthread_join(thread_info_arr[i].thread, NULL);
+            pthread_join(thread_info_arr[i].thread, NULL);
         }
     }
 }
