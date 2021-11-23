@@ -1,7 +1,3 @@
-/*
- * echo-server.c
- */
-
 #include <stdlib.h>
 #include <sys/types.h> 
 #include <sys/socket.h>
@@ -74,7 +70,12 @@ void *handle_client(void *arg) {
     struct message m;
     memset(&m, 0, sizeof(struct message));
     while(read_message_from_client(t, &m) != -1) {
-        share_message(t, &m);
+        if (m.sender[0] != '\0' && m.body[0] == '\0') {
+            memcpy(t->client_name, m.sender, NAME_LEN);
+        } else {
+            memcpy(m.sender, t->client_name, NAME_LEN);
+            share_message(t, &m);
+        }
     }
     printf("\n");
     close(t->conn_fd);
@@ -96,7 +97,6 @@ int main(int argc, char *argv[])
 
     /* initialize shared memory */
     init_thread_info_arr();
-    // new_message = (struct message *)mmap(NULL, sizeof(struct message), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 
     /* create a socket */
     listen_fd = socket(PF_INET, SOCK_STREAM, 0);

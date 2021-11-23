@@ -1,7 +1,3 @@
-/*
- * echo-client.c
- */
-
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -94,18 +90,6 @@ int main(int argc, char *argv[])
     pthread_join(conn_thread, NULL);
 
     close(conn_fd);
-
-    /* infinite loop of reading from terminal, sending the data, and printing
-     * what we get back */
-    /*
-    while((n = read(0, buf, BUF_SIZE)) > 0) {
-        send(conn_fd, buf, n, 0);
-
-        n = recv(conn_fd, buf, BUF_SIZE, 0);
-        printf("received: ");
-        puts(buf);
-    }
-    */
 }
 
 
