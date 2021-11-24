@@ -41,11 +41,12 @@ void *handle_conn(void *arg) {
     memcpy(&conn_fd, arg, sizeof(int));
     struct message m;
     memset(&m, 0, sizeof(struct message));
-    while (read_message_from_server(conn_fd, &m) != -1) {
+    while (read_message_from_server(conn_fd, &m) > 0) {
         print_message(&m);
         // printf("%s: %s\n", m.sender, m.body);
         fflush(stdout);
     }
+    printf("Disconnected from server\n");
     return NULL;
 }
 
