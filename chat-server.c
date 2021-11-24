@@ -54,7 +54,10 @@ ssize_t send_message_to_client(struct thread_info *t, struct message *m) {
 
 /* reads bytes from the socket into the message struct */
 ssize_t read_message_from_client(struct thread_info *t, struct message *m) {
-    if (LOG) printf("LOG: received a message from %s.\n\t%s\n", t->client_name, m->body);
+    if (LOG) {
+        printf("LOG: received a message from %s\n\t", t->client_name);
+        print_message(m);
+    }
     return recv(t->conn_fd, (char *)m, sizeof(struct message), 0);
 }
 
