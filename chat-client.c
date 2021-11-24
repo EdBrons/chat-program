@@ -26,7 +26,7 @@ void *handle_io(void *arg) {
     struct message m;
     memcpy(&conn_fd, arg, sizeof(int));
     memset(&m, 0, sizeof(struct message));
-    while (read_message_from_stdin(&m) != -1) {
+    while (read_message_from_stdin(&m) > 0) {
         if (send_message_to_server(conn_fd, &m) == -1) {
             perror("send");
         }
@@ -46,7 +46,6 @@ void *handle_conn(void *arg) {
         // printf("%s: %s\n", m.sender, m.body);
         fflush(stdout);
     }
-    printf("Disconnected from server\n");
     return NULL;
 }
 
@@ -89,9 +88,10 @@ int main(int argc, char *argv[])
     pthread_create(&conn_thread, NULL, handle_conn, &conn_fd);
 
     pthread_join(io_thread, NULL);
+    pthread_cancel(conn_thread);
     pthread_join(conn_thread, NULL);
+
+    printf("Disconnected from server\n");
 
     close(conn_fd);
 }
-
-
