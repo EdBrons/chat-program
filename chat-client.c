@@ -51,39 +51,6 @@ void *handle_conn(void *arg) {
     return NULL;
 }
 
-void *handle_client(void *arg) {
-    struct thread_args *s = arg;
-    char buf[BUF_SIZE];
-    struct message *mes = malloc(sizeof(struct message));
-    memset(buf, 0, BUF_SIZE);
-    memset(mes, 0, sizeof(struct message));
-    while (fgets(buf, BUF_SIZE, stdin) != NULL) {
-        parse_line(buf, mes);
-        send(s->conn_fd, (char *)mes, sizeof(struct message), 0);
-        memset(buf, 0, BUF_SIZE);
-        memset(mes, 0, sizeof(struct message));
-    }
-    return NULL;
-}
-
-// TODO: kill this process after handle_client ends
-void *listen_server(void *arg) {
-    struct thread_args *ta = arg;
-    struct message *mes = malloc(sizeof(struct message));
-    memset(mes, 0, sizeof(struct message));
-    while (1) {
-        recv(ta->conn_fd, (char *)mes, sizeof(struct message), 0);
-
-        if (mes->mode == NICK) {
-            printf("change name to: %s\n", mes->from);
-        } else {
-            printf("message body: %s\n", mes->body);
-        }
-
-        memset(mes, 0, sizeof(struct message));
-    }
-    return NULL;
-}
 
 int main(int argc, char *argv[])
 {

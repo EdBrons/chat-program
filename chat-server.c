@@ -116,13 +116,6 @@ void *handle_client(void *arg) {
     return NULL;
 }
 
-static size_t thread_count = 0;
-static size_t threads_len = 64;
-static pthread_t *threads;
-
-void *listen_client(void *arg) {
-}
-
 int main(int argc, char *argv[])
 {
     char *listen_port;
@@ -156,8 +149,6 @@ int main(int argc, char *argv[])
 
     /* start listening */
     listen(listen_fd, BACKLOG);
-
-    threads = malloc(sizeof(pthread_t) * thread_count);
 
     /* infinite loop of accepting new connections and handling them */
     while(1) {
