@@ -26,11 +26,12 @@ void *handle_io(void *arg) {
     struct message m;
     memcpy(&conn_fd, arg, sizeof(int));
     memset(&m, 0, sizeof(struct message));
-    while (read_message_from_stdin(&m) != -1) {
+    while (read_message_from_stdin(&m) > 0) {
         if (send_message_to_server(conn_fd, &m) == -1) {
             perror("send");
         }
     }
+    printf("Disconnected from server.\n");
     return NULL;
 }
 
@@ -41,10 +42,12 @@ void *handle_conn(void *arg) {
     memcpy(&conn_fd, arg, sizeof(int));
     struct message m;
     memset(&m, 0, sizeof(struct message));
-    while (read_message_from_server(conn_fd, &m) != -1) {
-        printf("%s: %s\n", m.sender, m.body);
+    while (read_message_from_server(conn_fd, &m) > 0) {
+        print_message(&m);
+        // printf("%s: %s\n", m.sender, m.body);
         fflush(stdout);
     }
+    printf("Connection closed by remote host.\n");
     return NULL;
 }
 
@@ -121,9 +124,8 @@ int main(int argc, char *argv[])
     pthread_create(&conn_thread, NULL, handle_conn, &conn_fd);
 
     pthread_join(io_thread, NULL);
+    pthread_cancel(conn_thread);
     pthread_join(conn_thread, NULL);
 
     close(conn_fd);
 }
-
-

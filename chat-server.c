@@ -22,6 +22,8 @@ struct thread_info {
     int conn_fd;
     int in_use_flag;
     char client_name[NAME_LEN];
+    char remote_ip[NAME_LEN];
+    uint16_t remote_port;
     pthread_t thread;
 };
 
@@ -56,7 +58,10 @@ ssize_t send_message_to_client(struct thread_info *t, struct message *m) {
 
 /* reads bytes from the socket into the message struct */
 ssize_t read_message_from_client(struct thread_info *t, struct message *m) {
-    if (LOG) printf("LOG: received a message from %s.\n", t->client_name);
+    if (LOG) {
+        printf("LOG: received a message from %s\n\t", t->client_name);
+        print_message(m);
+    }
     return recv(t->conn_fd, (char *)m, sizeof(struct message), 0);
 }
 
@@ -75,7 +80,7 @@ void create_nick_message(struct thread_info *t, struct message *m, char *name) {
 
 void create_connect_message(struct thread_info *t, struct message *m) {
     strncpy(m->sender, "Server", NAME_LEN);
-    snprintf(m->body, BODY_LEN, "%s connected.", t->client_name);
+    snprintf(m->body, BODY_LEN, "%s(%s:%d) connected.", t->client_name, t->remote_ip, t->remote_port);
 }
 
 void create_disconnect_message(struct thread_info *t, struct message *m) {
@@ -87,6 +92,9 @@ void create_disconnect_message(struct thread_info *t, struct message *m) {
 void *handle_client(void *arg) {
     struct thread_info *t = (struct thread_info *)arg;
     struct message m;
+    memset(&m, 0, sizeof(struct message));
+    create_connect_message(t, &m);
+    share_message(t, &m);
     memset(&m, 0, sizeof(struct message));
     while(read_message_from_client(t, &m) > 0) {
         if (m.sender[0] != '\0' && m.body[0] == '\0') {
@@ -173,6 +181,8 @@ int main(int argc, char *argv[])
         t->conn_fd = conn_fd;
         t->in_use_flag = 1;
         snprintf(t->client_name, NAME_LEN, "user_%ld", thread_count);
+        strncpy(t->remote_ip, remote_ip, NAME_LEN);
+        t->remote_port = remote_port;
         thread_count++;
         pthread_create(&t->thread, NULL, handle_client, t);
     }
