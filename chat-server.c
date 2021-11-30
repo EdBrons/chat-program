@@ -115,6 +115,7 @@ void *handle_client(void *arg) {
     share_message(t, &m);
     close(t->conn_fd);
     memset(t, 0, sizeof(struct thread_info));
+    thread_count--;
     return NULL;
 }
 
@@ -175,7 +176,7 @@ int main(int argc, char *argv[])
         memset(t, 0, sizeof(struct thread_info));
         t->conn_fd = conn_fd;
         t->in_use_flag = 1;
-        snprintf(t->client_name, NAME_LEN, "user_%ld", thread_count);
+        snprintf(t->client_name, NAME_LEN, "Guest");
         strncpy(t->remote_ip, remote_ip, NAME_LEN);
         t->remote_port = remote_port;
         thread_count++;
