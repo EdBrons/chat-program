@@ -39,12 +39,11 @@ void *handle_io(void *arg) {
  * and then handle it from there */
 void *handle_conn(void *arg) {
     int conn_fd;
-    memcpy(&conn_fd, arg, sizeof(int));
     struct message m;
+    memcpy(&conn_fd, arg, sizeof(int));
     memset(&m, 0, sizeof(struct message));
     while (read_message_from_server(conn_fd, &m) > 0) {
         print_message(&m);
-        // printf("%s: %s\n", m.sender, m.body);
         fflush(stdout);
     }
     printf("Connection closed by remote host.\n");
@@ -95,4 +94,6 @@ int main(int argc, char *argv[])
     pthread_join(conn_thread, NULL);
 
     close(conn_fd);
+
+    return 0;
 }

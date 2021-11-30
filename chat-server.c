@@ -42,7 +42,8 @@ void grow_thread_info_arr() {
 }
 
 struct thread_info *find_empty_thread_info() {
-    for (int i = 0; i < thread_max; i++) {
+    int i;
+    for (i = 0; i < thread_max; i++) {
         if (!thread_info_arr[i].in_use_flag) {
             return &thread_info_arr[i];
         }
@@ -66,7 +67,8 @@ ssize_t read_message_from_client(struct thread_info *t, struct message *m) {
 }
 
 void share_message(struct thread_info *t, struct message *m) {
-    for (int i = 0; i < thread_max; i++) {
+    int i;
+    for (i = 0; i < thread_max; i++) {
         if (thread_info_arr[i].in_use_flag && t != &thread_info_arr[i]) {
             send_message_to_client(&thread_info_arr[i], m);
         }
@@ -116,7 +118,7 @@ void *handle_client(void *arg) {
     return NULL;
 }
 
-int main(int argc, char *argv[])
+int main(int argc, char *argv[]) 
 {
     char *listen_port;
     int listen_fd, conn_fd;
@@ -126,6 +128,8 @@ int main(int argc, char *argv[])
     uint16_t remote_port;
     socklen_t addrlen;
     char *remote_ip;
+    struct thread_info *t;
+    int i;
 
     listen_port = argv[1];
 
@@ -167,7 +171,7 @@ int main(int argc, char *argv[])
         }
 
         /* create a new thread_info struct */
-        struct thread_info *t = find_empty_thread_info();
+        t = find_empty_thread_info();
         memset(t, 0, sizeof(struct thread_info));
         t->conn_fd = conn_fd;
         t->in_use_flag = 1;
@@ -179,7 +183,7 @@ int main(int argc, char *argv[])
     }
 
     /* join threads */
-    for (int i = 0; i < thread_max; i++) {
+    for (i = 0; i < thread_max; i++) {
         if (!thread_info_arr[i].in_use_flag) {
             pthread_join(thread_info_arr[i].thread, NULL);
         }
