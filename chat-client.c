@@ -31,6 +31,7 @@ void *handle_io(void *arg) {
             perror("send");
         }
     }
+    printf("Disconnected from server.\n");
     return NULL;
 }
 
@@ -46,6 +47,7 @@ void *handle_conn(void *arg) {
         // printf("%s: %s\n", m.sender, m.body);
         fflush(stdout);
     }
+    printf("Connection closed by remote host.\n");
     return NULL;
 }
 
@@ -90,8 +92,6 @@ int main(int argc, char *argv[])
     pthread_join(io_thread, NULL);
     pthread_cancel(conn_thread);
     pthread_join(conn_thread, NULL);
-
-    printf("Disconnected from server\n");
 
     close(conn_fd);
 }
