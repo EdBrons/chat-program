@@ -140,7 +140,9 @@ int main(int argc, char *argv[])
     }
 
     /* create a socket */
-    listen_fd = socket(PF_INET, SOCK_STREAM, 0);
+    if ((listen_fd = socket(PF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+    }
 
     /* bind it to a port */
     memset(&hints, 0, sizeof(hints));
@@ -152,16 +154,22 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    bind(listen_fd, res->ai_addr, res->ai_addrlen);
+    if (bind(listen_fd, res->ai_addr, res->ai_addrlen) != 0) {
+        perror("bind");
+    }
 
     /* start listening */
-    listen(listen_fd, BACKLOG);
+    if (listen(listen_fd, BACKLOG) != 0) {
+        perror("listen");
+    }
 
     /* infinite loop of accepting new connections and handling them */
     while(1) {
         /* accept a new connection (will block until one appears) */
         addrlen = sizeof(remote_sa);
-        conn_fd = accept(listen_fd, (struct sockaddr *) &remote_sa, &addrlen);
+        if ((conn_fd = accept(listen_fd, (struct sockaddr *) &remote_sa, &addrlen)) == -1) {
+            perror("accept");
+        }
 
         /* announce our communication partner */
         remote_ip = inet_ntoa(remote_sa.sin_addr);
@@ -184,13 +192,19 @@ int main(int argc, char *argv[])
         strncpy(t->remote_ip, remote_ip, NAME_LEN);
         t->remote_port = remote_port;
         thread_count++;
-        pthread_create(&t->thread, NULL, handle_client, t);
+        if (pthread_create(&t->thread, NULL, handle_client, t) != 0) {
+            perror("pthread_create");
+            break;
+        }
     }
 
     /* join threads */
     for (i = 0; i < thread_max; i++) {
         if (!thread_info_arr[i].in_use_flag) {
-            pthread_join(thread_info_arr[i].thread, NULL);
+            if (pthread_join(thread_info_arr[i].thread, NULL) != 0) {
+                perror("pthread_join");
+                break;
+            }
         }
     }
 }
