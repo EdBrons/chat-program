@@ -31,14 +31,18 @@ static size_t thread_max = INITIAL_THREAD_MAX;
 static size_t thread_count = 0;
 static struct thread_info *thread_info_arr = NULL;
 
-void init_thread_info_arr() {
-    munmap(thread_info_arr, sizeof(struct thread_info) * thread_max);
+int init_thread_info_arr() {
+    if (munmap(thread_info_arr, sizeof(struct thread_info) * thread_max) == -1) {
+        perror("munmap");
+        return -1;
+    }
     thread_info_arr = mmap(NULL, sizeof(struct thread_info) * thread_max, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+    return 1;
 }
 
-void grow_thread_info_arr() {
+int grow_thread_info_arr() {
     thread_max *= 2;
-    init_thread_info_arr();
+    return init_thread_info_arr();
 }
 
 struct thread_info *find_empty_thread_info() {
@@ -131,7 +135,9 @@ int main(int argc, char *argv[])
     listen_port = argv[1];
 
     /* initialize shared memory */
-    init_thread_info_arr();
+    if (init_thread_info_arr() == -1) {
+        return 1;
+    }
 
     /* create a socket */
     listen_fd = socket(PF_INET, SOCK_STREAM, 0);
@@ -164,7 +170,9 @@ int main(int argc, char *argv[])
 
         /* make sure we have enough space in thread arr */
         if (thread_count >= thread_max) {
-            grow_thread_info_arr();
+            if (grow_thread_info_arr() == -1) {
+                break;
+            }
         }
 
         /* create a new thread_info struct */
