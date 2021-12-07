@@ -9,11 +9,6 @@
 #include <pthread.h>
 #include "defs.h"
 
-/* reads bytes from a socket directly into a message struct */
-ssize_t read_message_from_server(int conn_fd, struct message *m) {
-    return recv(conn_fd, (char *)m, sizeof(struct message), 0);
-}
-
 /* we parse the input in read_message, and then send the
  * struct directly over the socket */
 void *handle_io(void *arg) {
@@ -21,7 +16,7 @@ void *handle_io(void *arg) {
     struct message m;
     memcpy(&conn_fd, arg, sizeof(int));
     memset(&m, 0, sizeof(struct message));
-    while (read_message_from_stdin(&m) > 0) {
+    while (recv(conn_fd, (char *)(&m), sizeof(struct message), 0) > 0) {
         if (send(conn_fd, (char *)(&m), sizeof(struct message), 0) == -1) {
             perror("send");
         }
@@ -37,7 +32,7 @@ void *handle_conn(void *arg) {
     struct message m;
     memcpy(&conn_fd, arg, sizeof(int));
     memset(&m, 0, sizeof(struct message));
-    while (read_message_from_server(conn_fd, &m) > 0) {
+    while (recv(conn_fd, (char *)(&m), sizeof(struct message), 0) > 0) {
         print_message(&m);
         fflush(stdout);
     }
