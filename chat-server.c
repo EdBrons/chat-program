@@ -53,16 +53,11 @@ struct thread_info *find_empty_thread_info() {
 
 /* sends message directly to client */
 ssize_t send_message_to_client(struct thread_info *t, struct message *m) {
-    if (LOG) printf("LOG: sent a message to %s.\n", t->client_name);
     return send(t->conn_fd, (char *)m, sizeof(struct message), 0);
 }
 
 /* reads bytes from the socket into the message struct */
 ssize_t read_message_from_client(struct thread_info *t, struct message *m) {
-    if (LOG) {
-        printf("LOG: received a message from %s\n\t", t->client_name);
-        print_message(m);
-    }
     return recv(t->conn_fd, (char *)m, sizeof(struct message), 0);
 }
 
@@ -77,6 +72,7 @@ void share_message(struct thread_info *t, struct message *m) {
 
 void create_nick_message(struct thread_info *t, struct message *m, char *name) {
     strncpy(m->sender, "Server", NAME_LEN);
+    printf("%s has changed their name to %s.\n", t->client_name, name);
     snprintf(m->body, BODY_LEN, "%s has changed their name to %s.", t->client_name, name);
 }
 
@@ -110,7 +106,7 @@ void *handle_client(void *arg) {
             share_message(t, &m);
         }
     }
-    if (LOG) printf("LOG: client %s disconnected.\n", t->client_name);
+    printf("client %s disconnected.\n", t->client_name);
     create_disconnect_message(t, &m);
     share_message(t, &m);
     close(t->conn_fd);
@@ -164,7 +160,7 @@ int main(int argc, char *argv[])
         /* announce our communication partner */
         remote_ip = inet_ntoa(remote_sa.sin_addr);
         remote_port = ntohs(remote_sa.sin_port);
-        if (LOG ) printf("LOG: new connection from %s:%d\n", remote_ip, remote_port);
+        printf("new connection from %s:%d\n", remote_ip, remote_port);
 
         /* make sure we have enough space in thread arr */
         if (thread_count >= thread_max) {
