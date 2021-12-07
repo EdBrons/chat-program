@@ -12,15 +12,13 @@
 #include <errno.h>
 #include "defs.h"
 
-#include "defs.h"
-
 #define BACKLOG 10
 
 #define INITIAL_THREAD_MAX 16
 
 struct thread_info {
     int conn_fd;
-    int in_use_flag;
+    int in_use;
     char client_name[NAME_LEN];
     char remote_ip[NAME_LEN];
     uint16_t remote_port;
@@ -51,7 +49,7 @@ int grow_thread_info_arr() {
 struct thread_info *find_empty_thread_info() {
     int i;
     for (i = 0; i < thread_max; i++) {
-        if (!thread_info_arr[i].in_use_flag) {
+        if (!thread_info_arr[i].in_use) {
             return &thread_info_arr[i];
         }
     }
@@ -61,7 +59,7 @@ struct thread_info *find_empty_thread_info() {
 void share_message(struct thread_info *t, struct message *m) {
     int i;
     for (i = 0; i < thread_max; i++) {
-        if (thread_info_arr[i].in_use_flag && t != &thread_info_arr[i]) {
+        if (thread_info_arr[i].in_use && t != &thread_info_arr[i]) {
             if (send(t->conn_fd, (char *)m, sizeof(struct message), 0) == -1) {
                 perror("send");
             }
@@ -182,7 +180,7 @@ int main(int argc, char *argv[])
         t = find_empty_thread_info();
         memset(t, 0, sizeof(struct thread_info));
         t->conn_fd = conn_fd;
-        t->in_use_flag = 1;
+        t->in_use = 1;
         snprintf(t->client_name, NAME_LEN, "Guest");
         strncpy(t->remote_ip, remote_ip, NAME_LEN);
         t->remote_port = remote_port;
@@ -195,7 +193,7 @@ int main(int argc, char *argv[])
 
     /* join threads */
     for (i = 0; i < thread_max; i++) {
-        if (!thread_info_arr[i].in_use_flag) {
+        if (!thread_info_arr[i].in_use) {
             if (pthread_join(thread_info_arr[i].thread, NULL) != 0) {
                 perror("pthread_join");
                 break;
