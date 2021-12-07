@@ -61,7 +61,7 @@ void share_message(struct thread_info *t, struct message *m) {
     for (i = 0; i < thread_max; i++) {
         if (thread_info_arr[i].in_use && t != &thread_info_arr[i]) {
             printf("sending a message\n");
-            if (send(t->conn_fd, (char *)m, sizeof(struct message), 0) == -1) {
+            if (send(thread_info_arr[i].conn_fd, (char *)m, sizeof(struct message), 0) == -1) {
                 perror("send");
             }
         }
