@@ -36,7 +36,10 @@ int init_thread_info_arr() {
         perror("munmap");
         return -1;
     }
-    thread_info_arr = mmap(NULL, sizeof(struct thread_info) * thread_max, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+    if ((thread_info_arr = mmap(NULL, sizeof(struct thread_info) * thread_max, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0)) == MAP_FAILED) {
+        perror("mmap");
+        return -1;
+    }
     return 1;
 }
 
