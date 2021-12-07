@@ -58,21 +58,13 @@ struct thread_info *find_empty_thread_info() {
     return NULL;
 }
 
-/* sends message directly to client */
-ssize_t send_message_to_client(struct thread_info *t, struct message *m) {
-    return send(t->conn_fd, (char *)m, sizeof(struct message), 0);
-}
-
-/* reads bytes from the socket into the message struct */
-ssize_t read_message_from_client(struct thread_info *t, struct message *m) {
-    return recv(t->conn_fd, (char *)m, sizeof(struct message), 0);
-}
-
 void share_message(struct thread_info *t, struct message *m) {
     int i;
     for (i = 0; i < thread_max; i++) {
         if (thread_info_arr[i].in_use_flag && t != &thread_info_arr[i]) {
-            send_message_to_client(&thread_info_arr[i], m);
+            if (send(t->conn_fd, (char *)m, sizeof(struct message), 0) == -1) {
+                perror("send");
+            }
         }
     }
 }
@@ -101,7 +93,7 @@ void *handle_client(void *arg) {
     create_connect_message(t, &m);
     share_message(t, &m);
     memset(&m, 0, sizeof(struct message));
-    while(read_message_from_client(t, &m) > 0) {
+    while(recv(t->conn_fd, (char *)(&m), sizeof(struct message), 0) > 0) {
         if (m.sender[0] != '\0' && m.body[0] == '\0') {
             char new_name[NAME_LEN];
             strncpy(new_name, m.sender, NAME_LEN);
