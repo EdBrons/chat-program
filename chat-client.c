@@ -12,10 +12,8 @@
 /* we parse the input in read_message, and then send the
  * struct directly over the socket */
 void *handle_io(void *arg) {
-    int conn_fd;
+    int conn_fd = *((int *)arg);
     struct message m;
-    memcpy(&conn_fd, arg, sizeof(int));
-    memset(&m, 0, sizeof(struct message));
     while (read_message_from_stdin(&m) > 0) {
     // while (recv(conn_fd, (char *)(&m), sizeof(struct message), 0) > 0) {
         if (send(conn_fd, (char *)(&m), sizeof(struct message), 0) == -1) {
@@ -29,10 +27,8 @@ void *handle_io(void *arg) {
 /* we read the bytes from the socket directly into a message struct
  * and then handle it from there */
 void *handle_conn(void *arg) {
-    int conn_fd;
+    int conn_fd = *((int *)arg);
     struct message m;
-    memcpy(&conn_fd, arg, sizeof(int));
-    memset(&m, 0, sizeof(struct message));
     while (recv(conn_fd, (char *)(&m), sizeof(struct message), 0) > 0) {
         print_message(&m);
         fflush(stdout);
