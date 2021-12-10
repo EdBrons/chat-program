@@ -4,7 +4,7 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <netdb.h>
+#include <netdb.h> 
 #include <string.h>
 #include <pthread.h>
 #include "defs.h"
@@ -16,7 +16,8 @@ void *handle_io(void *arg) {
     struct message m;
     memcpy(&conn_fd, arg, sizeof(int));
     memset(&m, 0, sizeof(struct message));
-    while (recv(conn_fd, (char *)(&m), sizeof(struct message), 0) > 0) {
+    while (read_message_from_stdin(&m) > 0) {
+    // while (recv(conn_fd, (char *)(&m), sizeof(struct message), 0) > 0) {
         if (send(conn_fd, (char *)(&m), sizeof(struct message), 0) == -1) {
             perror("send");
         }
@@ -47,6 +48,7 @@ int main(int argc, char *argv[])
     struct addrinfo hints, *res;
     int conn_fd;
     int rc;
+    int err;
 
     pthread_t io_thread;
     pthread_t conn_thread;
@@ -55,7 +57,9 @@ int main(int argc, char *argv[])
     dest_port     = argv[2];
 
     /* create a socket */
-    conn_fd = socket(PF_INET, SOCK_STREAM, 0);
+    if ((conn_fd = socket(PF_INET, SOCK_STREAM, 0)) == -1) {
+        perror("socket");
+    }
 
     /* client usually doesn't bind, which lets kernel pick a port number */
 
@@ -76,12 +80,35 @@ int main(int argc, char *argv[])
 
     printf("Connected\n");
 
-    pthread_create(&io_thread, NULL, handle_io, &conn_fd);
-    pthread_create(&conn_thread, NULL, handle_conn, &conn_fd);
+    err = pthread_create(&io_thread, NULL, handle_io, &conn_fd);
+    if (err) {
+        fprintf(stderr, "pthread_create: (%d)%s\n", err, strerror(err));
+        exit(EXIT_FAILURE);
+    }
 
-    pthread_join(io_thread, NULL);
-    pthread_cancel(conn_thread);
-    pthread_join(conn_thread, NULL);
+    err = pthread_create(&conn_thread, NULL, handle_conn, &conn_fd);
+    if (err) {
+        fprintf(stderr, "pthread_create: (%d)%s\n", err, strerror(err));
+        exit(EXIT_FAILURE);
+    }
+
+    err = pthread_join(io_thread, NULL);
+    if (err) {
+        fprintf(stderr, "pthread_join: (%d)%s\n", err, strerror(err));
+        exit(EXIT_FAILURE);
+    }
+
+    err = pthread_cancel(conn_thread);
+    if (err) {
+        fprintf(stderr, "pthread_cancel: (%d)%s\n", err, strerror(err));
+        exit(EXIT_FAILURE);
+    }
+
+    err = pthread_join(conn_thread, NULL);
+    if (err) {
+        fprintf(stderr, "pthread_join: (%d)%s\n", err, strerror(err));
+        exit(EXIT_FAILURE);
+    }
 
     close(conn_fd);
 
