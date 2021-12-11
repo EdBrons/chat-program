@@ -12,10 +12,6 @@ struct message {
     char body[BODY_LEN];
 };
 
-/* reads a message into m from stdin 
- * sets the contents of m to 0, before writing */
-int read_message_from_stdin(struct message *m);
-
 void print_message(struct message *m);
 
 #endif

@@ -9,6 +9,26 @@
 #include <pthread.h>
 #include "defs.h"
 
+/* reads a message into m from stdin 
+ * sets the contents of m to 0, before writing */
+int read_message_from_stdin(struct message *m) {
+    char buf[BUF_SIZE] = { 0 };
+    memset(m, 0, sizeof(struct message));
+    if (fgets(buf, BUF_SIZE, stdin) == NULL) {
+        return -1;
+    }
+    /* remove newlines from buf */
+    buf[strcspn(buf, "\n")] = '\0';
+    /* check if input is a command */
+    if (strncmp(buf, "/nick ", 6) == 0 && buf[6] != '\0') {
+        strncpy(m->sender, buf+6, NAME_LEN);
+    /* otherwise input is just a message */
+    } else {
+        strncpy(m->body, buf, BODY_LEN);
+    }
+    return 1;
+}
+
 /* we parse the input in read_message, and then send the
  * struct directly over the socket */
 void *handle_io(void *arg) {
