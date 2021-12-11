@@ -42,6 +42,7 @@ struct thread_info *get_new_thread_info() {
         threads_tail->next = t;
         threads_tail = t;
     }
+    t->next = NULL;
     pthread_mutex_unlock(&mutex);
     return t;
 }
@@ -67,17 +68,16 @@ void remove_thread_info(struct thread_info *t) {
 }
 
 void share_message(struct thread_info *t, struct message *m) {
-    pthread_mutex_lock(&mutex);
     struct thread_info *tp = threads_head;
     while (tp != NULL) {
         if (tp != t) {
+            printf("sending a message to %d.\n", tp->conn_fd);
             if (send(tp->conn_fd, (char *)m, sizeof(struct message), 0) == -1) {
                 perror("send");
             }
         }
         tp = tp->next;
     }
-    pthread_mutex_unlock(&mutex);
 }
 
 void create_nick_message(struct thread_info *t, struct message *m, char *name) {
