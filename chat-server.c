@@ -14,6 +14,8 @@
 
 #define BACKLOG 10
 
+pthread_mutex_t mutex;
+
 struct thread_info {
     int conn_fd;
     int in_use;
@@ -32,6 +34,7 @@ struct thread_info *get_new_thread_info() {
     if ((t = malloc(sizeof(struct thread_info))) == NULL) {
         return NULL;
     }
+    pthread_mutex_lock(&mutex);
     if (threads_head == NULL) {
         threads_head = t;
         threads_tail = t;
@@ -39,10 +42,12 @@ struct thread_info *get_new_thread_info() {
         threads_tail->next = t;
         threads_tail = t;
     }
+    pthread_mutex_unlock(&mutex);
     return t;
 }
 
 void remove_thread_info(struct thread_info *t) {
+    pthread_mutex_lock(&mutex);
     struct thread_info *tp = threads_head;
     while (tp != NULL) {
         if (tp->next == t) {
@@ -58,9 +63,11 @@ void remove_thread_info(struct thread_info *t) {
     if (t == threads_head) {
         threads_head = t->next;
     }
+    pthread_mutex_unlock(&mutex);
 }
 
 void share_message(struct thread_info *t, struct message *m) {
+    pthread_mutex_lock(&mutex);
     struct thread_info *tp = threads_head;
     while (tp != NULL) {
         if (tp != t) {
@@ -70,6 +77,7 @@ void share_message(struct thread_info *t, struct message *m) {
         }
         tp = tp->next;
     }
+    pthread_mutex_unlock(&mutex);
 }
 
 void create_nick_message(struct thread_info *t, struct message *m, char *name) {
