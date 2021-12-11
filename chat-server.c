@@ -14,8 +14,6 @@
 
 #define BACKLOG 10
 
-#define INITIAL_THREAD_MAX 16
-
 struct thread_info {
     int conn_fd;
     int in_use;
@@ -23,48 +21,54 @@ struct thread_info {
     char remote_ip[NAME_LEN];
     uint16_t remote_port;
     pthread_t thread;
+    struct thread_info *next;
 };
 
-static size_t thread_max = INITIAL_THREAD_MAX;
-static size_t thread_count = 0;
-static struct thread_info *thread_info_arr = NULL;
+static struct thread_info *threads_head = NULL;
+static struct thread_info *threads_tail = NULL;
 
-int init_thread_info_arr() {
-    if (munmap(thread_info_arr, sizeof(struct thread_info) * thread_max) == -1) {
-        perror("munmap");
-        return -1;
+struct thread_info *get_new_thread_info() {
+    struct thread_info *t;
+    if ((t = malloc(sizeof(struct thread_info))) == NULL) {
+        return NULL;
     }
-    if ((thread_info_arr = mmap(NULL, sizeof(struct thread_info) * thread_max, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0)) == MAP_FAILED) {
-        perror("mmap");
-        return -1;
+    if (threads_head == NULL) {
+        threads_head = t;
+        threads_tail = t;
+    } else {
+        threads_tail->next = t;
+        threads_tail = t;
     }
-    return 1;
+    return t;
 }
 
-int grow_thread_info_arr() {
-    thread_max *= 2;
-    return init_thread_info_arr();
-}
-
-struct thread_info *find_empty_thread_info() {
-    int i;
-    for (i = 0; i < thread_max; i++) {
-        if (!thread_info_arr[i].in_use) {
-            return &thread_info_arr[i];
+void remove_thread_info(struct thread_info *t) {
+    struct thread_info *tp = threads_head;
+    while (tp != NULL) {
+        if (tp->next == t) {
+            tp->next = t->next;
+            if (t == threads_tail) {
+                threads_tail = tp;
+            }
+            free(t);
+            break;
         }
+        tp = tp->next;
     }
-    return NULL;
+    if (t == threads_head) {
+        threads_head = t->next;
+    }
 }
 
 void share_message(struct thread_info *t, struct message *m) {
-    int i;
-    for (i = 0; i < thread_max; i++) {
-        if (thread_info_arr[i].in_use && t != &thread_info_arr[i]) {
-            printf("sending a message\n");
-            if (send(thread_info_arr[i].conn_fd, (char *)m, sizeof(struct message), 0) == -1) {
+    struct thread_info *tp = threads_head;
+    while (tp != NULL) {
+        if (tp != t) {
+            if (send(tp->conn_fd, (char *)m, sizeof(struct message), 0) == -1) {
                 perror("send");
             }
         }
+        tp = tp->next;
     }
 }
 
@@ -107,9 +111,10 @@ void *handle_client(void *arg) {
     printf("client %s disconnected.\n", t->client_name);
     create_disconnect_message(t, &m);
     share_message(t, &m);
-    close(t->conn_fd);
-    memset(t, 0, sizeof(struct thread_info));
-    thread_count--;
+    if (close(t->conn_fd) == -1) {
+        perror("close");
+    }
+    remove_thread_info(t);
     return NULL;
 }
 
@@ -124,14 +129,8 @@ int main(int argc, char *argv[])
     socklen_t addrlen;
     char *remote_ip;
     struct thread_info *t;
-    int i;
 
     listen_port = argv[1];
-
-    /* initialize shared memory */
-    if (init_thread_info_arr() == -1) {
-        return 1;
-    }
 
     /* create a socket */
     if ((listen_fd = socket(PF_INET, SOCK_STREAM, 0)) == -1) {
@@ -170,22 +169,13 @@ int main(int argc, char *argv[])
         remote_port = ntohs(remote_sa.sin_port);
         printf("new connection from %s:%d\n", remote_ip, remote_port);
 
-        /* make sure we have enough space in thread arr */
-        if (thread_count >= thread_max) {
-            if (grow_thread_info_arr() == -1) {
-                break;
-            }
-        }
-
         /* create a new thread_info struct */
-        t = find_empty_thread_info();
-        memset(t, 0, sizeof(struct thread_info));
+        t = get_new_thread_info();
         t->conn_fd = conn_fd;
         t->in_use = 1;
         snprintf(t->client_name, NAME_LEN, "Guest");
         strncpy(t->remote_ip, remote_ip, NAME_LEN);
         t->remote_port = remote_port;
-        thread_count++;
         if (pthread_create(&t->thread, NULL, handle_client, t) != 0) {
             perror("pthread_create");
             break;
@@ -193,13 +183,13 @@ int main(int argc, char *argv[])
     }
 
     /* join threads */
-    for (i = 0; i < thread_max; i++) {
-        if (!thread_info_arr[i].in_use) {
-            if (pthread_join(thread_info_arr[i].thread, NULL) != 0) {
-                perror("pthread_join");
-                break;
-            }
+    struct thread_info *tp = threads_head;
+    while (tp != NULL) {
+        if (pthread_join(tp->thread, NULL) != 0) {
+            perror("pthread_join");
+            break;
         }
+        tp = tp->next;
     }
 }
 
