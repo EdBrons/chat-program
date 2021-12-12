@@ -16,8 +16,8 @@ struct message {
     char buf[MESSAGE_MAX];
 };
 
-void print_message(struct message *m);
-
+/* prints a message with the current time prefixing the message */
+void message_print(struct message *m);
 char *message_get_sender(struct message *m);
 char *message_get_body(struct message *m);
 size_t message_get_size(struct message *m);

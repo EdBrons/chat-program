@@ -17,13 +17,12 @@
 pthread_mutex_t mutex;
 
 struct thread_info {
-    int conn_fd;
-    int in_use;
+    int conn_fd; /* socket of client */
     char client_name[NAME_LEN];
     char remote_ip[NAME_LEN];
     uint16_t remote_port;
     pthread_t thread;
-    struct thread_info *next;
+    struct thread_info *next; /* next thread_info in linked list */
 };
 
 static struct thread_info *threads_head = NULL;
@@ -31,10 +30,12 @@ static struct thread_info *threads_tail = NULL;
 
 struct thread_info *get_new_thread_info() {
     struct thread_info *t;
+
     if ((t = malloc(sizeof(struct thread_info))) == NULL) {
         return NULL;
     }
-    pthread_mutex_lock(&mutex);
+
+    pthread_mutex_lock(&mutex); /* mutex when accessing linked list */
     if (threads_head == NULL) {
         threads_head = t;
         threads_tail = t;
@@ -44,12 +45,14 @@ struct thread_info *get_new_thread_info() {
     }
     t->next = NULL;
     pthread_mutex_unlock(&mutex);
+
     return t;
 }
 
 void remove_thread_info(struct thread_info *t) {
-    pthread_mutex_lock(&mutex);
+    pthread_mutex_lock(&mutex); /* mutex when accessing linked list */
     struct thread_info *tp = threads_head;
+
     while (tp != NULL) {
         if (tp->next == t) {
             tp->next = t->next;
@@ -61,14 +64,17 @@ void remove_thread_info(struct thread_info *t) {
         }
         tp = tp->next;
     }
+
     if (t == threads_head) {
         threads_head = t->next;
     }
+
     pthread_mutex_unlock(&mutex);
 }
 
 void share_message(struct thread_info *t, struct message *m) {
     struct thread_info *tp = threads_head;
+
     while (tp != NULL) {
         if (tp != t) {
             if (send(tp->conn_fd, (char *)m, message_get_size(m), 0) == -1) {
@@ -79,17 +85,20 @@ void share_message(struct thread_info *t, struct message *m) {
     }
 }
 
+/* creates a message saying the client has changed their name */
 void create_nick_message(struct thread_info *t, struct message *m, char *name) {
     strncpy(message_get_sender(m), "Server", NAME_LEN);
     printf("%s has changed their name to %s.\n", t->client_name, name);
     snprintf(message_get_body(m), BODY_LEN, "%s has changed their name to %s.", t->client_name, name);
 }
 
+/* creates a message saying a client has connected with some ip and some port */
 void create_connect_message(struct thread_info *t, struct message *m) {
     strncpy(message_get_sender(m), "Server", NAME_LEN);
     snprintf(message_get_body(m), BODY_LEN, "%s(%s:%d) connected.", t->client_name, t->remote_ip, t->remote_port);
 }
 
+/* creates a message saying the client has disconnected */
 void create_disconnect_message(struct thread_info *t, struct message *m) {
     strncpy(message_get_sender(m), "Server", NAME_LEN);
     snprintf(message_get_body(m), BODY_LEN, "%s disconnected.", t->client_name);
@@ -100,29 +109,36 @@ void *handle_client(void *arg) {
     char buf[BUF_SIZE] = { 0 };
     struct thread_info *t = (struct thread_info *)arg;
     struct message m;
+
+    /* send message to other clients saying we connected */
     create_connect_message(t, &m);
     share_message(t, &m);
+
     while(recv(t->conn_fd, (char *)(&m), sizeof(struct message), 0) > 0) {
         switch (m.type) {
-            case MESSAGE_NICK:
+            case MESSAGE_NICK: /* we are changing our name */
                 strncpy(buf, message_get_sender(&m), NAME_LEN);
                 create_nick_message(t, &m, buf);
                 share_message(t, &m);
                 strncpy(t->client_name, buf, NAME_LEN);
                 break;
-            case MESSAGE_CHAT:
+            case MESSAGE_CHAT: /* we are sending a chat */
                 strncpy(buf, message_get_body(&m), BUF_SIZE);
                 strncpy(message_get_sender(&m), t->client_name, NAME_LEN);
                 strncpy(message_get_body(&m), buf, BODY_LEN);
                 share_message(t, &m);
                 break;
-            default:
+            default: /* something bad happend */
                 break;
         }
     }
+
+    /* log disconnection on server */
     printf("client %s disconnected.\n", t->client_name);
+    /* tell other clients */
     create_disconnect_message(t, &m);
     share_message(t, &m);
+
     if (close(t->conn_fd) == -1) {
         perror("close");
     }
@@ -183,11 +199,12 @@ int main(int argc, char *argv[])
 
         /* create a new thread_info struct */
         t = get_new_thread_info();
+
         t->conn_fd = conn_fd;
-        t->in_use = 1;
         snprintf(t->client_name, NAME_LEN, "Guest");
         strncpy(t->remote_ip, remote_ip, NAME_LEN);
         t->remote_port = remote_port;
+
         if (pthread_create(&t->thread, NULL, handle_client, t) != 0) {
             perror("pthread_create");
             break;
