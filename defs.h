@@ -3,8 +3,6 @@
 
 #include <stddef.h>
 
-#define LOG 1
-
 #define NAME_LEN 64
 #define BODY_LEN 1024
 #define BUF_SIZE 4096
