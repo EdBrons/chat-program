@@ -13,7 +13,7 @@
  * sets the contents of m to 0, before writing */
 int read_message_from_stdin(struct message *m) {
     char buf[BUF_SIZE] = { 0 };
-    memset(m, 0, sizeof(struct message));
+    m->type = MESSAGE_CHAT;
     if (fgets(buf, BUF_SIZE, stdin) == NULL) {
         return -1;
     }
@@ -21,10 +21,12 @@ int read_message_from_stdin(struct message *m) {
     buf[strcspn(buf, "\n")] = '\0';
     /* check if input is a command */
     if (strncmp(buf, "/nick ", 6) == 0 && buf[6] != '\0') {
-        strncpy(m->sender, buf+6, NAME_LEN);
+        m->type = MESSAGE_NICK;
+        strncpy(message_get_sender(m), buf+6, NAME_LEN);
     /* otherwise input is just a message */
     } else {
-        strncpy(m->body, buf, BODY_LEN);
+        m->buf[0] = '\0';
+        strncpy(message_get_body(m), buf, BODY_LEN);
     }
     return 1;
 }
@@ -34,11 +36,13 @@ int read_message_from_stdin(struct message *m) {
 void *handle_io(void *arg) {
     int conn_fd = *((int *)arg);
     struct message m;
+    memset(&m, 0, sizeof(m));
     while (read_message_from_stdin(&m) > 0) {
     // while (recv(conn_fd, (char *)(&m), sizeof(struct message), 0) > 0) {
-        if (send(conn_fd, (char *)(&m), sizeof(struct message), 0) == -1) {
+        if (send(conn_fd, (char *)(&m), message_get_size(&m), 0) == -1) {
             perror("send");
         }
+        memset(&m, 0, sizeof(m));
     }
     printf("Disconnected from server.\n");
     return NULL;

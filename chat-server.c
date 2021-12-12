@@ -71,8 +71,7 @@ void share_message(struct thread_info *t, struct message *m) {
     struct thread_info *tp = threads_head;
     while (tp != NULL) {
         if (tp != t) {
-            printf("sending a message to %d.\n", tp->conn_fd);
-            if (send(tp->conn_fd, (char *)m, sizeof(struct message), 0) == -1) {
+            if (send(tp->conn_fd, (char *)m, message_get_size(m), 0) == -1) {
                 perror("send");
             }
         }
@@ -81,39 +80,44 @@ void share_message(struct thread_info *t, struct message *m) {
 }
 
 void create_nick_message(struct thread_info *t, struct message *m, char *name) {
-    strncpy(m->sender, "Server", NAME_LEN);
+    strncpy(message_get_sender(m), "Server", NAME_LEN);
     printf("%s has changed their name to %s.\n", t->client_name, name);
-    snprintf(m->body, BODY_LEN, "%s has changed their name to %s.", t->client_name, name);
+    snprintf(message_get_body(m), BODY_LEN, "%s has changed their name to %s.", t->client_name, name);
 }
 
 void create_connect_message(struct thread_info *t, struct message *m) {
-    strncpy(m->sender, "Server", NAME_LEN);
-    snprintf(m->body, BODY_LEN, "%s(%s:%d) connected.", t->client_name, t->remote_ip, t->remote_port);
+    strncpy(message_get_sender(m), "Server", NAME_LEN);
+    snprintf(message_get_body(m), BODY_LEN, "%s(%s:%d) connected.", t->client_name, t->remote_ip, t->remote_port);
 }
 
 void create_disconnect_message(struct thread_info *t, struct message *m) {
-    strncpy(m->sender, "Server", NAME_LEN);
-    snprintf(m->body, BODY_LEN, "%s disconnected.", t->client_name);
+    strncpy(message_get_sender(m), "Server", NAME_LEN);
+    snprintf(message_get_body(m), BODY_LEN, "%s disconnected.", t->client_name);
 }
 
 
 void *handle_client(void *arg) {
+    char buf[BUF_SIZE] = { 0 };
     struct thread_info *t = (struct thread_info *)arg;
     struct message m;
-    memset(&m, 0, sizeof(struct message));
     create_connect_message(t, &m);
     share_message(t, &m);
-    memset(&m, 0, sizeof(struct message));
     while(recv(t->conn_fd, (char *)(&m), sizeof(struct message), 0) > 0) {
-        if (m.sender[0] != '\0' && m.body[0] == '\0') {
-            char new_name[NAME_LEN];
-            strncpy(new_name, m.sender, NAME_LEN);
-            create_nick_message(t, &m, new_name);
-            share_message(t, &m);
-            memcpy(t->client_name, new_name, NAME_LEN);
-        } else {
-            memcpy(m.sender, t->client_name, NAME_LEN);
-            share_message(t, &m);
+        switch (m.type) {
+            case MESSAGE_NICK:
+                strncpy(buf, message_get_sender(&m), NAME_LEN);
+                create_nick_message(t, &m, buf);
+                share_message(t, &m);
+                strncpy(t->client_name, buf, NAME_LEN);
+                break;
+            case MESSAGE_CHAT:
+                strncpy(buf, message_get_body(&m), BUF_SIZE);
+                strncpy(message_get_sender(&m), t->client_name, NAME_LEN);
+                strncpy(message_get_body(&m), buf, BODY_LEN);
+                share_message(t, &m);
+                break;
+            default:
+                break;
         }
     }
     printf("client %s disconnected.\n", t->client_name);
