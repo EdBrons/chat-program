@@ -81,6 +81,7 @@ void share_message(struct thread_info *t, struct message *m) {
         if (tp != t) {
             if (send(tp->conn_fd, (char *)m, message_get_size(m), 0) == -1) {
                 perror("send");
+                continue;
             }
         }
         tp = tp->next;
