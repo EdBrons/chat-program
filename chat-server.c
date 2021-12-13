@@ -74,6 +74,7 @@ void remove_thread_info(struct thread_info *t) {
 }
 
 void share_message(struct thread_info *t, struct message *m) {
+    pthread_mutex_lock(&mutex); /* mutex when accessing linked list */
     struct thread_info *tp = threads_head;
 
     while (tp != NULL) {
@@ -84,6 +85,7 @@ void share_message(struct thread_info *t, struct message *m) {
         }
         tp = tp->next;
     }
+    pthread_mutex_unlock(&mutex);
 }
 
 /* creates a message saying the client has changed their name */
@@ -142,6 +144,7 @@ void *handle_client(void *arg) {
 
     if (close(t->conn_fd) == -1) {
         perror("close");
+        return;
     }
     remove_thread_info(t);
     return NULL;
@@ -164,6 +167,7 @@ int main(int argc, char *argv[])
     /* create a socket */
     if ((listen_fd = socket(PF_INET, SOCK_STREAM, 0)) == -1) {
         perror("socket");
+        return 1;
     }
 
     /* bind it to a port */
@@ -178,11 +182,13 @@ int main(int argc, char *argv[])
 
     if (bind(listen_fd, res->ai_addr, res->ai_addrlen) != 0) {
         perror("bind");
+        return 1;
     }
 
     /* start listening */
     if (listen(listen_fd, BACKLOG) != 0) {
         perror("listen");
+        return 1;
     }
 
     /* infinite loop of accepting new connections and handling them */
@@ -191,6 +197,7 @@ int main(int argc, char *argv[])
         addrlen = sizeof(remote_sa);
         if ((conn_fd = accept(listen_fd, (struct sockaddr *) &remote_sa, &addrlen)) == -1) {
             perror("accept");
+            continue;
         }
 
         /* announce our communication partner */
@@ -223,7 +230,6 @@ int main(int argc, char *argv[])
         tp = tp->next;
     }
     pthread_mutex_unlock(&mutex); /* mutex when accessing linked list */
-
     return 0;
 }
 
