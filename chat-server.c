@@ -98,7 +98,7 @@ void create_nick_message(struct thread_info *t, struct message *m, char *name) {
 /* creates a message saying a client has connected with some ip and some port */
 void create_connect_message(struct thread_info *t, struct message *m) {
     strncpy(message_get_sender(m), "Server", NAME_LEN);
-    snprintf(message_get_body(m), BODY_LEN, "%s(%s:%d) connected.", t->client_name, t->remote_ip, t->remote_port);
+    snprintf(message_get_body(m), BODY_LEN, "%s connected.", t->client_name);
 }
 
 /* creates a message saying the client has disconnected */
@@ -144,7 +144,7 @@ void *handle_client(void *arg) {
 
     if (close(t->conn_fd) == -1) {
         perror("close");
-        return;
+        return NULL;
     }
     remove_thread_info(t);
     return NULL;
@@ -203,7 +203,7 @@ int main(int argc, char *argv[])
         /* announce our communication partner */
         remote_ip = inet_ntoa(remote_sa.sin_addr);
         remote_port = ntohs(remote_sa.sin_port);
-        printf("new connection from %s:%d\n", remote_ip, remote_port);
+        printf("New connection from %s:%d\n", remote_ip, remote_port);
 
         /* create a new thread_info struct */
         tp = get_new_thread_info();
