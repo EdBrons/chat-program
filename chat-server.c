@@ -118,7 +118,7 @@ void *handle_client(void *arg) {
     create_connect_message(t, &m);
     share_message(t, &m);
 
-    while(recv(t->conn_fd, (char *)(&m), sizeof(struct message), 0) > 0) {
+    while(recv(t->conn_fd, &m, sizeof(struct message), 0) > 0) {
         switch (m.type) {
             case MESSAGE_NICK: /* we are changing our name */
                 strncpy(buf, message_get_sender(&m), NAME_LEN);
