@@ -48,6 +48,7 @@ void *handle_io(void *arg) {
         }
     }
     printf("Disconnected from server.\n");
+    exit(0);
 
     return NULL;
 }
@@ -62,6 +63,7 @@ void *handle_conn(void *arg) {
         message_print(&m);
     }
     printf("Connection closed by remote host.\n");
+    exit(0);
 
     return NULL;
 }
