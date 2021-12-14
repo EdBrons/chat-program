@@ -50,8 +50,9 @@ struct thread_info *get_new_thread_info() {
 }
 
 void remove_thread_info(struct thread_info *t) {
+    struct thread_info *tp;
     pthread_mutex_lock(&mutex); /* mutex when accessing linked list */
-    struct thread_info *tp = threads_head;
+    tp = threads_head;
 
     while (tp != NULL) {
         if (tp->next == t) {
@@ -156,7 +157,7 @@ int main(int argc, char *argv[])
     uint16_t remote_port;
     socklen_t addrlen;
     char *remote_ip;
-    struct thread_info *t;
+    struct thread_info *tp;
 
     listen_port = argv[1];
 
@@ -198,21 +199,22 @@ int main(int argc, char *argv[])
         printf("new connection from %s:%d\n", remote_ip, remote_port);
 
         /* create a new thread_info struct */
-        t = get_new_thread_info();
+        tp = get_new_thread_info();
 
-        t->conn_fd = conn_fd;
-        snprintf(t->client_name, NAME_LEN, "Guest");
-        strncpy(t->remote_ip, remote_ip, NAME_LEN);
-        t->remote_port = remote_port;
+        tp->conn_fd = conn_fd;
+        snprintf(tp->client_name, NAME_LEN, "Guest");
+        strncpy(tp->remote_ip, remote_ip, NAME_LEN);
+        tp->remote_port = remote_port;
 
-        if (pthread_create(&t->thread, NULL, handle_client, t) != 0) {
+        if (pthread_create(&tp->thread, NULL, handle_client, tp) != 0) {
             perror("pthread_create");
             break;
         }
     }
 
     /* join threads */
-    struct thread_info *tp = threads_head;
+    pthread_mutex_lock(&mutex); /* mutex when accessing linked list */
+    tp = threads_head;
     while (tp != NULL) {
         if (pthread_join(tp->thread, NULL) != 0) {
             perror("pthread_join");
@@ -220,6 +222,9 @@ int main(int argc, char *argv[])
         }
         tp = tp->next;
     }
+    pthread_mutex_unlock(&mutex); /* mutex when accessing linked list */
+
+    return 0;
 }
 
 
