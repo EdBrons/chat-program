@@ -215,7 +215,7 @@ int main(int argc, char *argv[])
         tp->remote_port = remote_port;
 
         if (pthread_create(&tp->thread, NULL, handle_client, tp) != 0) {
-            remove_thread_info(tp)
+            remove_thread_info(tp);
             perror("pthread_create");
             break;
         }

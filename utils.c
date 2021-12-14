@@ -4,7 +4,6 @@
 #include <time.h>
 #include <stddef.h>
 
-
 char *message_get_sender(struct message *m) {
     return m->buf;
 }
